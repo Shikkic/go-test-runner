@@ -4,14 +4,32 @@ EXIT_STATUS=0
 # WIP
 # Reference command environator integration_test go test -v -cover -coverprofile=coverage.out -covermode=count $pkg;
 #GO_TEST_COMMAND_ARG='environator integration_test go test -v -cover -coverprofile=coverage.out -covermode=count $pkg'
+#verbose='false'
+file_path='.'
+
+# Parse Flags
+while getopts 'f:' flag; do
+  case "${flag}" in
+    #v) verbose='true' ;;
+    f) file_path="${OPTARG}" ;;
+    *) error "Unexpected option ${flag}" ;;
+  esac
+done
+
+echo "${file_path} IS THE ARG";
+
 
 COVERAGE_FILEPATH="${PWD}/coverage-all.out"
 MOCK_ARR=() 
 
+cd "$file_path"
+echo "OUR PATH: $PWD"
 echo "mode: count" > coverage-all.out
-for pkg in $( find . -name *.go -print0 | xargs -0 -n1 dirname | sort --unique ); do
+
+for pkg in $(find . -name *.go -print0 | xargs -0 -n1 dirname | sort --unique ); do
     # If the pkg filepath contains 'vendor' we do not want to test it.
     if ! [[ $pkg == *"vendor"* ]]; then
+        echo "pkgs: $pkg";
         # Run the go cover and output results to 'coverage.out'.
         OUTPUT=$(environator integration_test go test -v -cover -coverprofile=coverage.out -covermode=count $pkg);
         if [[ $OUTPUT == *"[no test files]" ]]; then
