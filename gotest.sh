@@ -10,13 +10,14 @@ main () {
     #    exit 1;
     #fi
 
+    # Set globle variable defaults.
     EXIT_STATUS=0
     MIN_COVERAGE_NUM=0
     VERBOSE_FLAG='false'
     file_path='.'
     MOCK_ARR=(); 
 
-    # Parse Flags.
+    # Parse flags and assign to global variables.
     while getopts ':n:f:v' flag; do
     case "${flag}" in
         n) MIN_COVERAGE_NUM="${OPTARG}" ;;
@@ -29,9 +30,24 @@ main () {
     # Change our working directory to the file path provided.
     cd "$file_path";
 
-    # Generate a new coverage-all.out
+    # Create a new coverage-all.out file.
     echo "mode: count" > coverage-all.out
 
+    # Generate coverage numbers for all go files in the given file_path.
+    generate_test_coverage
+
+    # Generate test report, and parse the total coverage number.
+    test_coverage_number=$(generate_test_coverage_number);
+    print_handler "\e[32mTest Coverage Percentage: $test_coverage_number\e[0m";
+
+    # Initiate clean up of any    
+    clean_up
+
+    print_handler "\e[32mExiting with status code $EXIT_STATUS\e[0m";
+    exit $EXIT_STATUS;
+}
+
+generate_test_coverage () {
     # For each go file found. 
     for pkg in $(find . -name *.go -print0 | xargs -0 -n1 dirname | sort --unique ); do
         # If the pkg filepath contains 'vendor' we do not want to test it.
@@ -50,11 +66,37 @@ main () {
             tail -n +2 coverage.out >> coverage-all.out;
         fi
     done
+}
 
-    # Generate test report, and parse the total coverage number.
-    test_coverage_number=$(generate_test_coverage_number);
-    print_handler "\e[32mTest Coverage Percentage: $test_coverage_number\e[0m";
 
+
+generate_test_coverage_number ()  {
+    local golang_test_coverage_report;
+    golang_test_coverage_report=$(environator integration_test go tool cover -func="${PWD}/coverage-all.out");
+
+    local test_coverage_number;
+    test_coverage_number=$(parse_test_coverage_number "$golang_test_coverage_report");
+
+    echo $test_coverage_number;
+}
+
+parse_test_coverage_number() {
+    local tail_of_report_string;
+    tail_of_report_string=$(echo $1 | tail -1);
+
+    local report_string_array;
+    report_string_array=($tail_of_report_string);
+
+    local total_test_coverage_percentage;
+    total_test_coverage_percentage=${report_string_array[-1]};
+    
+    local total_test_coverage_number;
+    total_test_coverage_number=$(echo $total_test_coverage_percentage | sed 's/%//');
+
+    echo $total_test_coverage_number;
+}
+
+clean_up () {
     print_handler "Deleteing Mock Test Files";
     for i in "${MOCK_ARR[@]}"
     do
@@ -62,29 +104,12 @@ main () {
         #rm $i;
     done
     print_handler "";
-
-    print_handler "\e[32mExiting with status code $EXIT_STATUS\e[0m";
-    exit $EXIT_STATUS;
 }
 
 print_handler () {
     if [[ "$VERBOSE_FLAG" = "true" ]]; then
         echo -e $1
     fi
-}
-
-generate_test_coverage_number() {
-    local golang_test_coverage_report=$(environator integration_test go tool cover -func="${PWD}/coverage-all.out");
-    local test_coverage_number=$(parse_test_coverage_number "$golang_test_coverage_report");
-    echo $test_coverage_number;
-}
-
-parse_test_coverage_number() {
-    local tail_of_report_string=$(echo $1 | tail -1);
-    local report_string_array=($tail_of_report_string);
-    local total_test_coverage_percentage=${report_string_array[-1]};
-    local total_test_coverage_number=$(echo $total_test_coverage_percentage | sed 's/%//');
-    echo $total_test_coverage_number;
 }
 
 # Run the main method.
