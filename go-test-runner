@@ -3,7 +3,9 @@
 # Evaluate total Golag test coverage for a given filepath. Optionally returns an error if test coverage is below a passed in threshold.
 #
 # (Written using Google's shell styleguide https://google.github.io/styleguide/shell.xml, for modifications to this script,
-# please consult styling guide).
+# please consult the styling guide).
+# 
+# Author Daniel Cadden, Github @Shikkic.
 
 main () {
     #if [[ $(whoami) != "vagrant" ]]; then
@@ -11,73 +13,103 @@ main () {
     #fi
 
     # Set globle variable defaults.
-    EXIT_STATUS=0
-    MIN_COVERAGE_NUM=0
-    VERBOSE_FLAG='false'
-    file_path='.'
-    MOCK_ARR=(); 
+    EXIT_STATUS=0;
+    MIN_COVERAGE_PERCENTAGE_NUM=0.0;
+    VERBOSE_FLAG='false';
+    FILE_PATH='.';
 
     # Parse flags and assign to global variables.
     while getopts ':n:f:v' flag; do
     case "${flag}" in
-        n) MIN_COVERAGE_NUM="${OPTARG}" ;;
+        n) MIN_COVERAGE_PERCENTAGE_NUM="${OPTARG}" ;;
         v) VERBOSE_FLAG="true" ;;
-        f) file_path="${OPTARG}" ;;
+        f) FILE_PATH="${OPTARG}" ;;
         *) error "Unexpected option ${flag}" ;;
     esac
     done
 
+    readonly MIN_COVERAGE_NU;
+    readonly VERBOSE_FLAG;
+    readonly FILE_PATH;
+    TEMP_TEST_FILE_PATHS_ARR=();
+
     # Change our working directory to the file path provided.
-    cd "$file_path";
+    cd "$FILE_PATH";
 
-    # Create a new coverage-all.out file.
-    echo "mode: count" > coverage-all.out
+    # Create a new coverage-all.out file, that will contain the contents of every individual 
+    # pkg's `coverage.out`.
+    echo "mode: count" > coverage-all.out;
 
-    # Generate coverage numbers for all go files in the given file_path.
-    generate_test_coverage
+    # Generate coverage numbers for all go files in the given FILE_PATH.
+    generate_test_coverage;
+
+    test_coverage_report=$(generate_test_coverage_report);
+    print_coverage_report "$test_coverage_report";
 
     # Generate test report, and parse the total coverage number.
-    test_coverage_number=$(generate_test_coverage_number);
-    print_handler "\e[32mTest Coverage Percentage: $test_coverage_number\e[0m";
+    current_test_coverage_number=$(generate_test_coverage_number "$test_coverage_report");
+    print_handler "\n\e[32mTest Coverage Percentage: $current_test_coverage_number%.\e[0m \n";
 
-    # Initiate clean up of any    
-    clean_up
+    # Check if the current test coverage number is above the threshold.
+    check_for_minimum_test_coverage_percentage "$current_test_coverage_number";
 
-    print_handler "\e[32mExiting with status code $EXIT_STATUS\e[0m";
+    # Initiate clean up.   
+    clean_up;
+
+    # TODO add color here.
+    echo -e "\e[32mExiting with status code $EXIT_STATUS\e[0m";
     exit $EXIT_STATUS;
 }
 
+check_for_minimum_test_coverage_percentage () {
+    local current_test_coverage_number;
+    current_test_coverage_number="$1";
+    current_test_coverage_number=$(echo ${current_test_coverage_number%%.*});
+    MIN_COVERAGE_PERCENTAGE_NUM=$(echo ${MIN_COVERAGE_PERCENTAGE_NUM%%.*});
+
+    if ! [[ "$current_test_coverage_number" -ge "$MIN_COVERAGE_PERCENTAGE_NUM" ]]; then
+        print_handler "\e[31mERROR: The current test coverage of $current_test_coverage_number% 
+        is not above the threshold of $MIN_COVERAGE_PERCENTAGE_NUM%.
+        Please review your changes and add test coverage for those changes.\e[0m \n";
+        EXIT_STATUS=1;
+    fi
+}
+
+# TODO Refactor this func.
 generate_test_coverage () {
+    echo -e "\e[33m";
     # For each go file found. 
     for pkg in $(find . -name *.go -print0 | xargs -0 -n1 dirname | sort --unique ); do
         # If the pkg filepath contains 'vendor' we do not want to test it.
         if ! [[ $pkg == *"vendor"* ]]; then
             # Run the go cover and output results to 'coverage.out'.
             OUTPUT=$(environator integration_test go test -v -cover -coverprofile=coverage.out -covermode=count $pkg);
-            if [[ $OUTPUT == *"[no test files]" ]]; then
+            if [[ $OUTPUT == *"[no test files]"* ]]; then
                 BASE_FOLDER_NAME=$(basename $pkg);
                 MOCK_FILE_PATH="${PWD}/${pkg}/${BASE_FOLDER_NAME}_test.go";
-                MOCK_ARR+=($MOCK_FILE_PATH)
+                TEMP_TEST_FILE_PATHS_ARR+=($MOCK_FILE_PATH)
                 touch $MOCK_FILE_PATH;
                 echo "package ${BASE_FOLDER_NAME}" > $MOCK_FILE_PATH;
                 k=$(environator integration_test go test -v -cover -coverprofile=coverage.out -covermode=count $pkg);
             fi
+
             # Take the results of coverage.out and append them to coverage-all.out.
             tail -n +2 coverage.out >> coverage-all.out;
         fi
     done
+    echo -e "\e[0m";
 }
 
-
-
-generate_test_coverage_number ()  {
+generate_test_coverage_report () {
     local golang_test_coverage_report;
     golang_test_coverage_report=$(environator integration_test go tool cover -func="${PWD}/coverage-all.out");
+    echo "$golang_test_coverage_report";
+}
 
+generate_test_coverage_number ()  {
     local test_coverage_number;
-    test_coverage_number=$(parse_test_coverage_number "$golang_test_coverage_report");
-
-    echo $test_coverage_number;
+    test_coverage_number=$(parse_test_coverage_number "$1");
+    echo "$test_coverage_number";
 }
 
 parse_test_coverage_number() {
@@ -98,12 +130,32 @@ parse_test_coverage_number() {
 
 clean_up () {
     print_handler "Deleteing Mock Test Files";
-    for i in "${MOCK_ARR[@]}"
+    for i in "${TEMP_TEST_FILE_PATHS_ARR[@]}"
     do
         print_handler "\e[31mDeleteing $i\e[0m";
-        #rm $i;
+        rm $i;
     done
     print_handler "";
+}
+
+print_coverage_report () {
+    local report_arr
+    report_arr=($1);
+    local count
+    count=0;
+    local temp
+    temp="";
+    
+    for i in "${report_arr[@]}"
+    do
+        if [[ $((count % 3)) == 0 ]]; then
+            print_handler "\e[33m$temp\e[0m";
+            temp="";
+        fi
+        temp+=$i" ";
+        count=$(( count + 1 ));
+    done
+    print_handler "\e[33m$temp\e[0m"; 
 }
 
 print_handler () {
