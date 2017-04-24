@@ -36,6 +36,9 @@ main () {
     # Change our working directory to the file path provided.
     cd "$FILE_PATH";
 
+    # Make sure we initiate clean up before exiting.
+    trap clean_up EXIT;
+
     # Create a new coverage-all.out file, that will contain the contents of every individual 
     # pkg's `coverage.out`.
     echo "mode: count" > coverage-all.out;
@@ -53,18 +56,17 @@ main () {
     # Check if the current test coverage number is above the threshold.
     check_for_minimum_test_coverage_percentage "$current_test_coverage_number";
 
-    # Initiate clean up.   
-    clean_up;
-
-    # TODO add color here.
-    echo -e "\e[32mExiting with status code $EXIT_STATUS\e[0m";
+    exit_status_color="\e[32m";
+    if [[ $EXIT_STATUS -eq 1 ]]; then
+        exit_status_color="\e[31m";
+    fi
+    echo -e $exit_status_color"Exiting with status code $EXIT_STATUS\e[0m\n";
     exit $EXIT_STATUS;
 }
 
 check_for_minimum_test_coverage_percentage () {
     local current_test_coverage_number;
-    current_test_coverage_number="$1";
-    current_test_coverage_number=$(echo ${current_test_coverage_number%%.*});
+    current_test_coverage_number=$(echo ${1%%.*});
     MIN_COVERAGE_PERCENTAGE_NUM=$(echo ${MIN_COVERAGE_PERCENTAGE_NUM%%.*});
 
     if ! [[ "$current_test_coverage_number" -ge "$MIN_COVERAGE_PERCENTAGE_NUM" ]]; then
