@@ -38,8 +38,8 @@ main () {
     # Create a new coverage-all.out file, that will contain the contents of every individual 
     # pkg's `coverage.out`.
     echo "mode: count" > coverage-all.out;
-    TEMP_TEST_FILE_PATHS_ARR+=("${PWD}/coverage-all.out");
-    TEMP_TEST_FILE_PATHS_ARR+=("${PWD}/coverage.out");
+    #TEMP_TEST_FILE_PATHS_ARR+=("${PWD}/coverage-all.out");
+    #TEMP_TEST_FILE_PATHS_ARR+=("${PWD}/coverage.out");
 
     # Generate coverage numbers for all go files in the given FILE_PATH.
     generate_test_coverage;
@@ -58,6 +58,12 @@ main () {
     if [[ $EXIT_STATUS -eq 1 ]]; then
         exit_status_color="\033[31m";
     fi
+
+    rm coverage.out
+    mv coverage-all.out coverage.txt
+
+    # Send coverage results to codecov
+    bash <(curl -s https://codecov.io/bash)
 
     echo -e $exit_status_color" Exiting with status code $EXIT_STATUS\033[0m\n";
     exit $EXIT_STATUS;
@@ -82,7 +88,7 @@ generate_test_coverage () {
     # For each go file found. 
     for pkg in $(find . -name "*.go" -print0 | xargs -0 -n1 dirname | sort --unique ); do
         # If the pkg filepath contains 'vendor' we do not want to test it.
-        if ! [[ $pkg == *"vendor"* ]]; then
+        if [[ ${pkg} != *"vendor"* && ${pkg} != *"mock"* ]]; then
             # Run the go cover and output results to 'coverage.out'.
             OUTPUT=$(go test -v -cover -coverprofile=coverage.out -covermode=count $pkg);
             if [[ $OUTPUT == *"[no test files]"* ]]; then
