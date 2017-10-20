@@ -35,15 +35,15 @@ main () {
     # Make sure we initiate clean up before exiting.
     trap clean_up EXIT;
 
-    # Create a new coverage-all.out file, that will contain the contents of every individual 
+    # Create a new coverage-all.txt file, that will contain the contents of every individual 
     # pkg's `coverage.out`.
-    echo "mode: count" > coverage-all.out;
-    #TEMP_TEST_FILE_PATHS_ARR+=("${PWD}/coverage-all.out");
-    #TEMP_TEST_FILE_PATHS_ARR+=("${PWD}/coverage.out");
+    echo "mode: count" > coverage-all.txt;
+    TEMP_TEST_FILE_PATHS_ARR+=("${PWD}/coverage.out");
 
     # Generate coverage numbers for all go files in the given FILE_PATH.
     generate_test_coverage;
 
+    # Print the coverage report.
     test_coverage_report=$(generate_test_coverage_report);
     print_coverage_report "$test_coverage_report";
 
@@ -54,16 +54,11 @@ main () {
     # Check if the current test coverage number is above the threshold.
     check_for_minimum_test_coverage_percentage "$current_test_coverage_number";
 
+    # Assign a correlating color to the exit_status.
     exit_status_color="\033[32m";
     if [[ $EXIT_STATUS -eq 1 ]]; then
         exit_status_color="\033[31m";
     fi
-
-    # Delete the last generated coverage.out.
-    rm coverage.out
-    
-    # Rename the aggregated coverage report to `coverage.txt`.
-    mv coverage-all.out coverage.txt
 
     echo -e $exit_status_color" Exiting with status code $EXIT_STATUS\033[0m\n";
     exit $EXIT_STATUS;
@@ -82,7 +77,6 @@ check_for_minimum_test_coverage_percentage () {
     fi
 }
 
-# TODO Refactor this func.
 generate_test_coverage () {
     echo -e '\033[33m';
     # For each go file found. 
@@ -101,8 +95,8 @@ generate_test_coverage () {
                 k=$(go test -v -cover -coverprofile=coverage.out -covermode=count $pkg);
             fi
 
-            # Take the results of coverage.out and append them to coverage-all.out.
-            tail -n +2 coverage.out >> coverage-all.out;
+            # Take the results of coverage.out and append them to coverage-all.txt.
+            tail -n +2 coverage.out >> coverage-all.txt;
         fi
     done
     echo -e "\033[0m";
@@ -110,7 +104,7 @@ generate_test_coverage () {
 
 generate_test_coverage_report () {
     local golang_test_coverage_report;
-    golang_test_coverage_report=$(go tool cover -func="${PWD}/coverage-all.out");
+    golang_test_coverage_report=$(go tool cover -func="${PWD}/coverage-all.txt");
     echo "$golang_test_coverage_report";
 }
 
