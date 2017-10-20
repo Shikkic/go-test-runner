@@ -59,11 +59,11 @@ main () {
         exit_status_color="\033[31m";
     fi
 
+    # Delete the last generated coverage.out.
     rm coverage.out
+    
+    # Rename the aggregated coverage report to `coverage.txt`.
     mv coverage-all.out coverage.txt
-
-    # Send coverage results to codecov
-    bash <(curl -s https://codecov.io/bash)
 
     echo -e $exit_status_color" Exiting with status code $EXIT_STATUS\033[0m\n";
     exit $EXIT_STATUS;
