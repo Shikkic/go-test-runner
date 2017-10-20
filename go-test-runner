@@ -13,13 +13,15 @@ main () {
     MIN_COVERAGE_PERCENTAGE_NUM=0.0;
     VERBOSE_FLAG='false';
     FILE_PATH='.';
+    BUILD_FLAGS='';
 
     # Parse flags and assign to global variables.
-    while getopts ':n:f:v' flag; do
+    while getopts ':n:f:t:v' flag; do
     case "${flag}" in
         n) MIN_COVERAGE_PERCENTAGE_NUM="${OPTARG}" ;;
-        v) VERBOSE_FLAG="true" ;;
         f) FILE_PATH="${OPTARG}" ;;
+        t) BUILD_FLAGS="${OPTARG}" ;;
+        v) VERBOSE_FLAG="true" ;;
         *) error "Unexpected option ${flag}" ;;
     esac
     done
@@ -84,7 +86,7 @@ generate_test_coverage () {
         # If the pkg filepath contains 'vendor' we do not want to test it.
         if [[ ${pkg} != *"vendor"* && ${pkg} != *"mock"* ]]; then
             # Run the go cover and output results to 'coverage.out'.
-            OUTPUT=$(go test -v -cover -coverprofile=coverage.out -covermode=count $pkg);
+            OUTPUT=$(go test -v --tags "$BUILD_FLAGS" -cover -coverprofile=coverage.out -covermode=count $pkg);
             if [[ $OUTPUT == *"[no test files]"* ]]; then
                 print_handler "no tests founds for "$pkg
                 BASE_FOLDER_NAME=$(basename $pkg);
@@ -92,7 +94,7 @@ generate_test_coverage () {
                 TEMP_TEST_FILE_PATHS_ARR+=($MOCK_FILE_PATH)
                 touch $MOCK_FILE_PATH;
                 echo "package ${BASE_FOLDER_NAME}" > $MOCK_FILE_PATH;
-                k=$(go test -v -cover -coverprofile=coverage.out -covermode=count $pkg);
+                k=$(go test -v --tags "$BUILD_FLAGS" -cover -coverprofile=coverage.out -covermode=count $pkg);
             fi
 
             # Take the results of coverage.out and append them to coverage-all.txt.
